@@ -72,6 +72,7 @@
             </div>
         </div>
         <div id="detections"></div>
+        <div id="damage-list"></div>
     </div>
 </div>
 
@@ -103,12 +104,20 @@
                 success: function(data) {
                     $('#outputImage').attr('src', 'data:image/jpeg;base64,' + data.image);
                     $('#detections').empty();
+                    $('#damage-list').empty();
                     data.detections.forEach(det => {
                         $('#detections').append(`
                             <div class="alert alert-info">
                                 Class: ${det.class} <br>
                                 Confidence: ${det.confidence.toFixed(2)}
                                 <br> Box: ${det.box}
+                                <br> <strong>ระดับความเสียหาย: ${det.severity}</strong> <!-- เสียหาย -->
+                                <br> <img src="data:image/jpeg;base64,${det.cropped_image}" class="preview-image" alt="Cropped Image">ลองตัดส่วนครอปมาแสดงเฉยๆ
+                            </div>
+                        `);
+                        $('#damage-list').append(`
+                            <div class="alert alert-warning">
+                               ${det.class} (${translateClass(det.class)}) - <strong>ระดับความเสียหาย: ${det.severity}</strong>
                             </div>
                         `);
                     });
@@ -118,6 +127,20 @@
                 }
             });
         });
+        
+        function translateClass(className) {
+            const translations = {
+                'Front-lamp-Damage': 'ไฟหน้าเสียหาย',
+                'Rear-lamp-Damage': 'ไฟท้ายเสียหาย',
+                'Sidemirror-Damage': 'กระจกมองข้างเสียหาย',
+                'Windscreen-Damage': 'กระจกหน้าเสียหาย',
+                'bonnet-damage': 'ฝากระโปรงหน้าเสียหาย',
+                'doorouter-damage': 'ประตูเสียหาย',
+                'front-bumper-damage': 'กันชนหน้าเสียหาย',
+                'rear-bumper-damage': 'กันชนท้ายเสียหาย'
+            };
+            return translations[className] || className;
+        }
     });
 </script>
 
