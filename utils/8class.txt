@@ -1,0 +1,8 @@
+Front-lamp-Damage
+Rear-lamp-Damage
+Sidemirror-Damage
+Windscreen-Damage
+bonnet-damage
+doorouter-damage
+front-bumper-damage
+rear-bumper-damage

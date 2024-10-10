@@ -1,126 +1,93 @@
-from flask import Flask,request,jsonify,send_file,make_response
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token, get_jwt
-from datetime import timedelta
-import os
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import base64
-import cv2
+from ultralytics import YOLO
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-from io import BytesIO
-from PIL import Image
-from datetime import datetime
+import io
+import base64
 
 app = Flask(__name__)
-CORS(app)  # เปิดใช้งาน CORS
+CORS(app)
 
+# โหลด YOLOv8 model
+model = YOLO('C:/Users/ASUS/Desktop/Pr-Cardamage/Cardamage-pattern-recognition/modelver36.1/Cardamagebypart_ver36.1.pt')
 
+# กำหนดฟอนต์
+font_path = 'ARLRDBD.ttf'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
+font_size = 20
+font = ImageFont.truetype(font_path, font_size)
 
-######################################################################
-#API base
-@app.route('/')
-def index():
-    return ""
-######################################################################
+# ฟังก์ชันแปลงภาพจาก request เป็น numpy array
+def read_image(file):
+    img = Image.open(file)
+    return img
 
-# API detection
-# ส่งรูปจากกล้องมา
-@app.route('/request_pic', methods=['POST'])
-@jwt_required()
-def handle_request_video():
-    # Connect to the database
-    mydb = mysql.connector.connect(host=host, user=user, password=password, database=database)
-    mycursor = mydb.cursor(dictionary=True)
+@app.route('/detect', methods=['POST'])
+def detect_damage():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image provided'}), 400
         
-    # Get current user from JWT
-    current_user = get_jwt_identity()
+        # รับไฟล์รูปภาพ
+        image_file = request.files['image']
+        image = read_image(image_file)
+        image_np = np.array(image)
+
+        # ใช้ YOLOv8 ทำการตรวจจับ damage
+        results = model(image_np)
         
-    # Check if the user exists
-    sql = "SELECT * FROM user WHERE name = %s"
-    val = (current_user,)
-    mycursor.execute(sql, val)
-    user_result = mycursor.fetchone()
-        
-    # If user does not exist, return an error response
-    if not user_result:
-        return make_response(jsonify({"msg": "Token is bad"}), 404)
-    # แปลง base64 กลับมาเป็นภาพ
-    data = request.get_json()
-    datas = data['imageData']
-    header, encoded = datas.split(",", 1)
-    img_data = base64.b64decode(encoded)
-    image = Image.open(BytesIO(img_data))
-    frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    if frame is not None:
-        frames, num,filename = camera.get_pic(frame)
-        print(num)
-        sum = num[0]+num[1]+num[2]+num[3]+num[4]#+num[5]
-        false = num[1]
-        if(sum != 0):
-            
-            percent = (false/sum) *100
-            x = float("{:.2f}".format(percent))
-            # print(x)
-        else:
-            x = 0
-        response_data = {
-        "num": num,      # ข้อมูลตัวเลข
-        "filename": filename,  # ชื่อไฟล์
-        "percent": x
-        
+        # วาดกรอบสี่เหลี่ยมบนภาพ
+        draw = ImageDraw.Draw(image)
+
+        # กำหนดสีสำหรับแต่ละ class
+        class_colors = {
+            'Front-lamp-Damage': 'red',
+            'Rear-lamp-Damage': 'blue',
+            'Sidemirror-Damage': 'green',
+            'Windscreen-Damage': 'yellow',
+            'Bonnet-Damage': 'purple',
+            'Doorouter-Damage': 'orange',
+            'Front-Bumper-Damage': 'pink',
+            'Rear-Bumper-Damage': 'cyan'
         }
-        if frames is not None: 
-            print(num)
-            return jsonify(response_data)
-        else:   
-            return "Error: Failed to grab frame from camera"
-    else :
-        print("ssss")
-
-# ลบรูปที่ถ่าย
-@app.route('/delete_capture', methods=['POST'])
-@jwt_required()
-def delete_capture():
-    # Connect to the database
-    mydb = mysql.connector.connect(host=host, user=user, password=password, database=database)
-    mycursor = mydb.cursor(dictionary=True)
         
-    # Get current user from JWT
-    current_user = get_jwt_identity()
-        
-    # Check if the user exists
-    sql = "SELECT * FROM user WHERE name = %s"
-    val = (current_user,)
-    mycursor.execute(sql, val)
-    user_result = mycursor.fetchone()
-        
-    # If user does not exist, return an error response
-    if not user_result:
-        return make_response(jsonify({"msg": "Token is bad"}), 404)
-    data = request.get_json()
-    filename = data['filename']
-    if os.path.exists(filename):
-        os.remove(filename)
-        return jsonify({'status': 'Delete', 'data_received': data}), 200
-    else:
-        return jsonify({'error': 'No data provided'}), 400
+        detected_objects = []
+        for result in results:
+            for box in result.boxes:
+                # ดึงค่าพิกัดของกล่อง
+                box_coords = [float(coord) for coord in box.xyxy[0]]
+                class_name = model.names[int(box.cls)]
+                confidence = float(box.conf)
 
+                # กำหนดสีจาก class_name
+                color = class_colors.get(class_name, 'white')
 
-# ดึงรูปที่ถ่าย
-@app.route('/image', methods=['GET'])
-def image():
-    filename = request.args.get('filename')
-    print("aaaaa=" + filename)
-    file_path = os.path.join(app.root_path, filename) 
-    if os.path.exists(file_path):  # ตรวจสอบว่าไฟล์มีอยู่จริงหรือไม่
-        return send_file(file_path, mimetype='image/jpeg')
-    else:
-        return "File not found", 404  # ส่งโค้ด 404 หากไม่พบไฟล์
-######################################################################
+                # วาดกรอบสี่เหลี่ยมบนภาพ
+                draw.rectangle(box_coords, outline=color, width=3)
 
+                # วาด label บนกล่อง
+                draw.text((box_coords[0], box_coords[1] - 10), f"{class_name} ({confidence:.2f})", fill=color, font=font)
 
+                detected_objects.append({
+                    'class': class_name,
+                    'confidence': confidence,
+                    'box': box_coords
+                })
 
-######################################################################
-# Main
+        # ปรับขนาดภาพ
+        image = image.resize((640, 640), Image.LANCZOS)
+
+        # แปลงภาพที่มีกรอบเป็น base64
+        img_io = io.BytesIO()
+        image.save(img_io, 'JPEG')
+        img_io.seek(0)
+
+        # แปลงเป็น base64 string
+        img_base64 = base64.b64encode(img_io.getvalue()).decode('utf-8')
+
+        return jsonify({'detections': detected_objects, 'image': img_base64})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run()
-######################################################################
+    app.run(debug=True)
