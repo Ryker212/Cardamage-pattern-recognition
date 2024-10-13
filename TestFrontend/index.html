@@ -14,13 +14,17 @@
         .container {
             max-width: 900px;
             margin: auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         .preview-image {
-            max-width: 100%; /* Set max width to 100% */
-            max-height: 640px; /* Set max height to 640 pixels */
+            max-width: 100%;
+            max-height: 640px;
             border: 1px solid #dee2e6;
             margin-bottom: 20px;
-            object-fit: contain; /* Maintain aspect ratio */
+            object-fit: contain;
         }
         .result {
             margin-top: 20px;
@@ -37,9 +41,34 @@
             padding: 10px;
             background-color: #fff;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            display: flex; /* Enable flexbox */
-            justify-content: center; /* Center horizontally */
-            align-items: center; /* Center vertically */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+        h2, h3, h4 {
+            color: #007bff;
+        }
+        .drop-zone {
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #007bff;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background-color: #e9ecef;
         }
     </style>
 </head>
@@ -52,6 +81,7 @@
             <label for="image">Select an image:</label>
             <input type="file" class="form-control-file" id="image" name="image" accept="image/*" required>
         </div>
+        <div class="drop-zone" id="dropZone">Drag and drop an image here or click to select</div>
         <button type="submit" class="btn btn-primary btn-block">Upload</button>
     </form>
 
@@ -83,6 +113,52 @@
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script>
     $(document).ready(function() {
+        const dropZone = $('#dropZone');
+        const fileInput = $('#image');
+
+        dropZone.on('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.addClass('dragover');
+        });
+
+        dropZone.on('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.removeClass('dragover');
+        });
+
+        dropZone.on('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.removeClass('dragover');
+            const files = e.originalEvent.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput[0].files = files;
+                handleFiles(files);
+            }
+        });
+
+        dropZone.on('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.on('change', function() {
+            const files = fileInput[0].files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+        });
+
+        function handleFiles(files) {
+            const file = files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                $('#originalImage').attr('src', event.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
         $('#uploadForm').on('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
@@ -108,18 +184,18 @@
                     data.detections.forEach(det => {
                         $('#detections').append(`
                             <div class="alert alert-info">
-                                Class: ${det.class} <br>
-                                Confidence: ${det.confidence.toFixed(2)}
-                                <br> Box: ${det.box}
-                                <br> <strong>ระดับความเสียหาย: ${det.severity}</strong> <!-- เสียหาย -->
-                                <br> <img src="data:image/jpeg;base64,${det.cropped_image}" class="preview-image" alt="Cropped Image">ลองตัดส่วนครอปมาแสดงเฉยๆ
+                                <strong>Class:</strong> ${det.class} (${translateClass(det.class)})<br>
+                                <strong>Confidence:</strong> ${det.confidence.toFixed(2)}<br>
+                                <strong>Box:</strong> ${det.box}<br>
+                                <strong>ระดับความเสียหาย:</strong> ${det.severity}<br>
+                                <img src="data:image/jpeg;base64,${det.cropped_image}" class="preview-image" alt="Cropped Image">
                             </div>
                         `);
-                        $('#damage-list').append(`
-                            <div class="alert alert-warning">
-                               ${det.class} (${translateClass(det.class)}) - <strong>ระดับความเสียหาย: ${det.severity}</strong>
-                            </div>
-                        `);
+                        // $('#damage-list').append(`
+                        //     <div class="alert alert-warning">
+                        //         ${det.class} (${translateClass(det.class)}) - <strong>ระดับความเสียหาย:</strong> ${det.severity}
+                        //     </div>
+                        // `);
                     });
                 },
                 error: function(xhr, status, error) {
@@ -127,17 +203,17 @@
                 }
             });
         });
-        
+
         function translateClass(className) {
             const translations = {
                 'Front-lamp-Damage': 'ไฟหน้าเสียหาย',
                 'Rear-lamp-Damage': 'ไฟท้ายเสียหาย',
                 'Sidemirror-Damage': 'กระจกมองข้างเสียหาย',
                 'Windscreen-Damage': 'กระจกหน้าเสียหาย',
-                'bonnet-damage': 'ฝากระโปรงหน้าเสียหาย',
-                'doorouter-damage': 'ประตูเสียหาย',
-                'front-bumper-damage': 'กันชนหน้าเสียหาย',
-                'rear-bumper-damage': 'กันชนท้ายเสียหาย'
+                'Bonnet-Damage': 'ฝากระโปรงหน้าเสียหาย',
+                'Doorouter-Damage': 'ประตูเสียหาย',
+                'Front-Bumper-Damage': 'กันชนหน้าเสียหาย',
+                'Rear-Bumper-Damage': 'กันชนท้ายเสียหาย'
             };
             return translations[className] || className;
         }
