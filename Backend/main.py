@@ -1,3 +1,4 @@
+import random
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from ultralytics import YOLO
@@ -10,8 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # โหลด YOLOv8 model
-model = YOLO('C:/Users/ASUS/Desktop/Pr-Cardamage/Cardamage-pattern-recognition/modelver36.1/Cardamagebypart_ver36.1.pt')
-
+severity_model = YOLO('ป')#
 # กำหนดฟอนต์
 font_path = 'ARLRDBD.ttf'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
 font_size = 20
@@ -21,6 +21,11 @@ font = ImageFont.truetype(font_path, font_size)
 def read_image(file):
     img = Image.open(file)
     return img
+# ฟังก์ชันแปลงภาพเป็น base64
+def image_to_base64(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 @app.route('/detect', methods=['POST'])
 def detect_damage():
@@ -73,6 +78,42 @@ def detect_damage():
                     'confidence': confidence,
                     'box': box_coords
                 })
+        #โมเดลระดบความเสียหาย
+        # severity_results = []
+        # for obj in detected_objects:
+        #     # ตัดภาพส่วนที่เสียหายออกมา
+        #     x1, y1, x2, y2 = map(int, obj['box'])
+        #     cropped_image = image.crop((x1, y1, x2, y2))
+        #     cropped_image_np = np.array(cropped_image)
+
+        #     # ใช้โมเดลที่สองในการประเมินระดับความเสียหาย
+        #     severity_result = severity_model(cropped_image_np)#
+        #     severity_level = 
+
+        #     severity_results.append({
+        #         'class': obj['class'],
+        #         'confidence': obj['confidence'],
+        #         'box': obj['box'],
+        #         'severity': severity_level
+        #     })
+        # Fake
+        severity_levels = ['Minor Dam', 'Moderate Dam', 'Severe Dam']
+        severity_results = []
+        for obj in detected_objects:
+            severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
+
+            x1, y1, x2, y2 = map(int, obj['box'])
+            cropped_image = image.crop((x1, y1, x2, y2))
+            
+            severity_results.append({
+                'class': obj['class'],
+                'confidence': obj['confidence'],
+                'box': obj['box'],
+                'severity': severity_level,
+                'cropped_image': image_to_base64(cropped_image) #ภาพที่ได้มา
+            })
+            
+
 
         # ปรับขนาดภาพ
         image = image.resize((640, 640), Image.LANCZOS)
@@ -85,7 +126,8 @@ def detect_damage():
         # แปลงเป็น base64 string
         img_base64 = base64.b64encode(img_io.getvalue()).decode('utf-8')
 
-        return jsonify({'detections': detected_objects, 'image': img_base64})
+        #return jsonify({'detections': detected_objects, 'image': img_base64})
+        return jsonify({'detections': severity_results, 'image': img_base64})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
