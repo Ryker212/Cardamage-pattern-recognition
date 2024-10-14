@@ -69,6 +69,11 @@ def detect_damage():
                 class_name = model.names[int(box.cls)]
                 confidence = float(box.conf)
 
+                # ตัดภาพส่วนที่เสียหายออกมาก่อนวาดกรอบ
+                x1, y1, x2, y2 = map(int, box_coords)
+                cropped_image = image.crop((x1, y1, x2, y2))
+                cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
+
                 # กำหนดสีจาก class_name
                 color = class_colors.get(class_name, 'white')
 
@@ -81,7 +86,8 @@ def detect_damage():
                 detected_objects.append({
                     'class': class_name,
                     'confidence': confidence,
-                    'box': box_coords
+                    'box': box_coords,
+                    'cropped_image': image_to_base64(cropped_image)  # เพิ่มภาพที่ถูกตัดออกมา
                 })
         #โมเดลระดบความเสียหาย
         # severity_results = []
@@ -93,7 +99,6 @@ def detect_damage():
 
         #     # ใช้โมเดลที่สองในการประเมินระดับความเสียหาย
         #     severity_result = severity_model(cropped_image_np)#
-        #     severity_level = 
 
         #     severity_results.append({
         #         'class': obj['class'],
@@ -107,15 +112,16 @@ def detect_damage():
         for obj in detected_objects:
             severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
 
-            x1, y1, x2, y2 = map(int, obj['box'])
-            cropped_image = image.crop((x1, y1, x2, y2))
+            #x1, y1, x2, y2 = map(int, obj['box'])
+            #cropped_image = image.crop((x1, y1, x2, y2))
             
+            cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
             severity_results.append({
                 'class': obj['class'],
                 'confidence': obj['confidence'],
                 'box': obj['box'],
                 'severity': severity_level,
-                'cropped_image': image_to_base64(cropped_image) #ภาพที่ได้มา
+                'cropped_image': obj['cropped_image']  # ใช้ภาพที่ถูกตัดออกมาโดยตรง
             })
             
 
