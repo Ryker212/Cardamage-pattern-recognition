@@ -103,6 +103,7 @@
         </div>
         <div id="detections"></div>
         <div id="damage-list"></div>
+        <button id="save-pdf">Save as PDF</button>
     </div>
 </div>
 
@@ -111,6 +112,8 @@
 <!-- Bootstrap JS and dependencies -->
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<!-- jsPDF library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 <script>
     $(document).ready(function() {
         const dropZone = $('#dropZone');
@@ -159,6 +162,47 @@
             reader.readAsDataURL(file);
         }
 
+        // ปุ่มสรางpdf
+        $('#save-pdf').on('click', function () {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // หัวเรื่อง
+            doc.text("Detection Report", 10, 10);
+             // ดึงวันที่และเวลาในปัจจุบัน
+             const currentDate = new Date();
+             const dateStr = currentDate.toLocaleDateString();
+             const timeStr = currentDate.toLocaleTimeString();
+
+             // เพิ่มวันที่และเวลาที่มุมขวาบน
+             const pageWidth = doc.internal.pageSize.getWidth();  // ดึงความกว้างของหน้ากระดาษ
+             doc.text(`Date: ${dateStr}`, pageWidth - 50, 10);    // กำหนดตำแหน่ง x และ y
+             doc.text(`Time: ${timeStr}`, pageWidth - 50, 20);    // กำหนดตำแหน่ง x และ y
+
+
+            // 
+            let yPosition = 40;
+            $('#detections .alert').each(function() {
+                const className = $(this).find('strong:contains("Class:")')[0].nextSibling.nodeValue.trim();
+                const severity = $(this).find('strong:contains("ระดับความเสียหาย:")')[0].nextSibling.nodeValue.trim();
+                console.log(`Class: ${className}, Severity: ${severity}`);
+                const croppedImageSrc = $(this).find('img').attr('src');
+
+                doc.text(`Class: ${className}`, 10, yPosition);
+                doc.text(`Severity: ${severity}`, 10, yPosition + 10);
+
+                //  cropped image
+                const img = new Image();
+                img.src = croppedImageSrc;
+                doc.addImage(img, 'JPEG', 10, yPosition + 20, 50, 50);
+
+                yPosition += 80; // Adjust yPosition for next entry
+            });
+
+            // เซฟเป็น PDF
+            doc.save('reportCarDamage.pdf');
+        });
+
         $('#uploadForm').on('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
@@ -184,18 +228,14 @@
                     data.detections.forEach(det => {
                         $('#detections').append(`
                             <div class="alert alert-info">
-                                <strong>Class:</strong> ${det.class} (${translateClass(det.class)})<br>
+                                <strong>Class:</strong> ${det.class} <br>
+                               
                                 <strong>Confidence:</strong> ${det.confidence.toFixed(2)}<br>
                                 <strong>Box:</strong> ${det.box}<br>
                                 <strong>ระดับความเสียหาย:</strong> ${det.severity}<br>
                                 <img src="data:image/jpeg;base64,${det.cropped_image}" class="preview-image" alt="Cropped Image">
                             </div>
                         `);
-                        // $('#damage-list').append(`
-                        //     <div class="alert alert-warning">
-                        //         ${det.class} (${translateClass(det.class)}) - <strong>ระดับความเสียหาย:</strong> ${det.severity}
-                        //     </div>
-                        // `);
                     });
                 },
                 error: function(xhr, status, error) {
@@ -203,7 +243,7 @@
                 }
             });
         });
-
+        //ไม่ใช้ละ
         function translateClass(className) {
             const translations = {
                 'Front-lamp-Damage': 'ไฟหน้าเสียหาย',
