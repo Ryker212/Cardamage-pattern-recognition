@@ -10,7 +10,7 @@ import base64
 
 app = Flask(__name__)
 CORS(app)
-model_level = load_model(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\model-level-ver1.0\my_modelver3.100.h5')
+model_level = load_model(r'C:\Users\ASUS\Desktop\model levelcar\my_modelver3.100.h5')
 # โหลด YOLOv8 model
 model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver40.1.50\Cardamagebypart_ver40.1.50.pt')
 # กำหนดฟอนต์
