@@ -1,5 +1,6 @@
 import random
 from flask import Flask, request, jsonify
+from tensorflow.keras.models import load_model
 from flask_cors import CORS
 from ultralytics import YOLO
 from PIL import Image, ImageDraw, ImageFont
@@ -9,11 +10,11 @@ import base64
 
 app = Flask(__name__)
 CORS(app)
-
 # โหลด YOLOv8 model
-model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver41.2.30\Cardamagebypart_ver41.2.30.pt')
+
 # กำหนดฟอนต์
-font_path = r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\Backend\ARLRDBD.TTF'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
+#font_path = r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\Backend\ARLRDBD.TTF'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
+font_path = 'ARLRDBD.ttf'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
 font_size = 20
 font = ImageFont.truetype(font_path, font_size)
 
@@ -37,58 +38,63 @@ def detect_damage():
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image provided'}), 400
-        
-        # รับไฟล์รูปภาพ
-        image_file = request.files['image']
-        image = read_image(image_file)
-        image_np = np.array(image)
 
-        # ใช้ YOLOv8 ทำการตรวจจับ damage
-        results = model(image_np,conf=0.5,iou=0.4)
-        
-        # วาดกรอบสี่เหลี่ยมบนภาพ
-        draw = ImageDraw.Draw(image)
+        # รับไฟล์รูปภาพทั้งหมดที่อัปโหลด
+        image_files = request.files.getlist('image')
 
-        # กำหนดสีสำหรับแต่ละ class
-        class_colors = {
-            'Front-lamp-Damage': 'red',
-            'Rear-lamp-Damage': 'blue',
-            'Sidemirror-Damage': 'green',
-            'Windscreen-Damage': 'yellow',
-            'Bonnet-Damage': 'purple',
-            'Doorouter-Damage': 'orange',
-            'Front-Bumper-Damage': 'pink',
-            'Rear-Bumper-Damage': 'cyan'
-        }
-        
-        detected_objects = []
-        for result in results:
-            for box in result.boxes:
-                # ดึงค่าพิกัดของกล่อง
-                box_coords = [float(coord) for coord in box.xyxy[0]]
-                class_name = model.names[int(box.cls)]
-                confidence = float(box.conf)
+        all_results = []  # เก็บผลลัพธ์ทั้งหมด
 
-                # ตัดภาพส่วนที่เสียหายออกมาก่อนวาดกรอบ
-                x1, y1, x2, y2 = map(int, box_coords)
-                cropped_image = image.crop((x1, y1, x2, y2))
-                cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
+        # วนลูปประมวลผลแต่ละไฟล์
+        for image_file in image_files:
+            image = read_image(image_file)
+            image_np = np.array(image)
 
-                # กำหนดสีจาก class_name
-                color = class_colors.get(class_name, 'white')
+            # ใช้ YOLOv8 ทำการตรวจจับ damage
+            results = model(image_np, conf=0.5, iou=0.5)
 
-                # วาดกรอบสี่เหลี่ยมบนภาพ
-                draw.rectangle(box_coords, outline=color, width=3)
+            # วาดกรอบสี่เหลี่ยมบนภาพ
+            draw = ImageDraw.Draw(image)
 
-                # วาด label บนกล่อง
-                draw.text((box_coords[0], box_coords[1] - 10), f"{class_name} ({confidence:.2f})", fill=color, font=font)
+            # กำหนดสีสำหรับแต่ละ class
+            class_colors = {
+              'Front-lamp-Damage': 'red',
+              'Rear-lamp-Damage': 'blue',
+              'Sidemirror-Damage': 'green',
+              'Windscreen-Damage': 'yellow',
+              'bonnet-damage': 'purple',
+              'doorouter-damage': 'orange',
+              'front-bumper-damage': 'pink',
+              'rear-bumper-damage': 'cyan'
+            }
 
-                detected_objects.append({
-                    'class': class_name,
-                    'confidence': confidence,
-                    'box': box_coords,
-                    'cropped_image': image_to_base64(cropped_image)  # เพิ่มภาพที่ถูกตัดออกมา
-                })
+            detected_objects = []
+            for result in results:
+                for box in result.boxes:
+                    # ดึงค่าพิกัดของกล่อง
+                    box_coords = [float(coord) for coord in box.xyxy[0]]
+                    class_name = model.names[int(box.cls)]
+                    confidence = float(box.conf)
+
+                    # ตัดภาพส่วนที่เสียหายออกมาก่อนวาดกรอบ
+                    x1, y1, x2, y2 = map(int, box_coords)
+                    cropped_image = image.crop((x1, y1, x2, y2))
+                    cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
+
+                    # กำหนดสีจาก class_name
+                    color = class_colors.get(class_name, 'white')
+
+                    # วาดกรอบสี่เหลี่ยมบนภาพ
+                    draw.rectangle(box_coords, outline=color, width=3)
+
+                    # วาด label บนกล่อง
+                    draw.text((box_coords[0], box_coords[1] - 10), f"{class_name} ({confidence:.2f})", fill=color, font=font)
+
+                    detected_objects.append({
+                        'class': class_name,
+                        'confidence': confidence,
+                        'box': box_coords,
+                        'cropped_image': image_to_base64(cropped_image)  # เพิ่มภาพที่ถูกตัดออกมา
+                    })
         #โมเดลระดบความเสียหาย
         # severity_results = []
         # for obj in detected_objects:
@@ -107,38 +113,41 @@ def detect_damage():
         #         'severity': severity_level
         #     })
         # Fake
-        severity_levels = ['Minor Dam', 'Moderate Dam', 'Severe Dam']
-        severity_results = []
-        for obj in detected_objects:
-            severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
+        # สุ่มระดับความเสียหาย (เพราะตอนนี้ไม่มีโมเดลประเมินความเสียหาย)
+            severity_levels = ['Minor Damage', 'Moderate Damage', 'Severe Damage']
+            severity_results = []
+            for obj in detected_objects:
+                cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
+                cropped_image_np = np.array(cropped_image) / 255.0  # ปรับขนาดค่าพิกเซลให้เป็น 0-1
 
-            #x1, y1, x2, y2 = map(int, obj['box'])
-            #cropped_image = image.crop((x1, y1, x2, y2))
-            
-            cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
-            severity_results.append({
-                'class': obj['class'],
-                'confidence': obj['confidence'],
-                'box': obj['box'],
-                'severity': severity_level,
-                'cropped_image': obj['cropped_image']  # ใช้ภาพที่ถูกตัดออกมาโดยตรง
-            })
-            
+                cropped_image_np = np.expand_dims(cropped_image_np, axis=0)
+                severity_prediction = model_level.predict(cropped_image_np)
+                severity_level = severity_levels[np.argmax(severity_prediction)]
+                #severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
+                severity_results.append({
+                    'class': obj['class'],
+                    'confidence': obj['confidence'],
+                    'box': obj['box'],
+                    'severity': severity_level,
+                    'cropped_image': obj['cropped_image']
+                })
 
+            # ปรับขนาดภาพ
+            image = image.resize((640, 640), Image.LANCZOS)
 
-        # ปรับขนาดภาพ
-        image = image.resize((640, 640), Image.LANCZOS)
+            # แปลงภาพที่มีกรอบเป็น base64
+            img_io = io.BytesIO()
+            image.save(img_io, 'JPEG')
+            img_io.seek(0)
 
-        # แปลงภาพที่มีกรอบเป็น base64
-        img_io = io.BytesIO()
-        image.save(img_io, 'JPEG')
-        img_io.seek(0)
+            # แปลงเป็น base64 string
+            img_base64 = base64.b64encode(img_io.getvalue()).decode('utf-8')
 
-        # แปลงเป็น base64 string
-        img_base64 = base64.b64encode(img_io.getvalue()).decode('utf-8')
+            # เก็บผลลัพธ์ทั้งหมด
+            all_results.append({'detections': severity_results, 'image': img_base64})
 
-        #return jsonify({'detections': detected_objects, 'image': img_base64})
-        return jsonify({'detections': severity_results, 'image': img_base64})
+        # ส่งผลลัพธ์ทั้งหมดกลับไป
+        return jsonify({'results': all_results})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
