@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 model_level = load_model(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\model-level-ver1.0\my_modelver3.100.h5')
 # โหลด YOLOv8 model
-model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver42.1.50\Cardamagebypart_ver42.1.50.pt')
+model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver40.1.50\Cardamagebypart_ver40.1.50.pt')
 # กำหนดฟอนต์
 font_path = r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\Backend\ARLRDBD.TTF'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
 font_size = 20
@@ -45,7 +45,7 @@ def detect_damage():
         #image = image.resize((640, 640), Image.LANCZOS)
         image_np = np.array(image) # แปลงค่าให้เป็น 0-1 
         # ใช้ YOLOv8 ทำการตรวจจับ damage
-        results = model(image_np, conf=0.5, iou=0.5)
+        results = model(image, conf=0.5, iou=0.5)
         
         # วาดกรอบสี่เหลี่ยมบนภาพ
         draw = ImageDraw.Draw(image)
