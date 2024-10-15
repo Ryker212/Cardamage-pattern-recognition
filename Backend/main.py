@@ -1,5 +1,6 @@
 import random
 from flask import Flask, request, jsonify
+from tensorflow.keras.models import load_model
 from flask_cors import CORS
 from ultralytics import YOLO
 from PIL import Image, ImageDraw, ImageFont
@@ -9,9 +10,9 @@ import base64
 
 app = Flask(__name__)
 CORS(app)
-
+model_level = load_model(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\model-level-ver1.0\my_modelver3.100.h5')
 # โหลด YOLOv8 model
-model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver41.2.30\Cardamagebypart_ver41.2.30.pt')
+model = YOLO(r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\modelver42.1.50\Cardamagebypart_ver42.1.50.pt')
 # กำหนดฟอนต์
 font_path = r'C:\Users\ASUS\Desktop\Pr-Cardamage\Cardamage-pattern-recognition\Backend\ARLRDBD.TTF'  # ตรวจสอบให้แน่ใจว่ามีฟอนต์นี้
 font_size = 20
@@ -41,24 +42,24 @@ def detect_damage():
         # รับไฟล์รูปภาพ
         image_file = request.files['image']
         image = read_image(image_file)
-        image_np = np.array(image)
-
+        #image = image.resize((640, 640), Image.LANCZOS)
+        image_np = np.array(image) # แปลงค่าให้เป็น 0-1 
         # ใช้ YOLOv8 ทำการตรวจจับ damage
-        results = model(image_np,conf=0.5,iou=0.4)
+        results = model(image_np, conf=0.5, iou=0.5)
         
         # วาดกรอบสี่เหลี่ยมบนภาพ
         draw = ImageDraw.Draw(image)
 
         # กำหนดสีสำหรับแต่ละ class
-        class_colors = {
+        class_colors = { 
             'Front-lamp-Damage': 'red',
             'Rear-lamp-Damage': 'blue',
             'Sidemirror-Damage': 'green',
             'Windscreen-Damage': 'yellow',
-            'Bonnet-Damage': 'purple',
-            'Doorouter-Damage': 'orange',
-            'Front-Bumper-Damage': 'pink',
-            'Rear-Bumper-Damage': 'cyan'
+            'bonnet-damage': 'purple',
+            'doorouter-damage': 'orange',
+            'front-bumper-damage': 'pink',
+            'rear-bumper-damage': 'cyan'
         }
         
         detected_objects = []
@@ -110,8 +111,18 @@ def detect_damage():
         severity_levels = ['Minor Dam', 'Moderate Dam', 'Severe Dam']
         severity_results = []
         for obj in detected_objects:
-            severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
+            # ตัดภาพส่วนที่เสียหายออกมา
+            x1, y1, x2, y2 = map(int, obj['box'])
+            cropped_image = image.crop((x1, y1, x2, y2))
+        
+            # ปรับขนาดภาพให้ตรงตามที่โมเดลคาดหวัง
+            cropped_image = cropped_image.resize((224, 224), Image.LANCZOS)
+            cropped_image_np = np.array(cropped_image) / 255.0  # ปรับขนาดค่าพิกเซลให้เป็น 0-1
 
+            cropped_image_np = np.expand_dims(cropped_image_np, axis=0)
+            severity_prediction = model_level.predict(cropped_image_np)
+            severity_level = severity_levels[np.argmax(severity_prediction)]  # แปลงผลลัพธ์เป็นระดับความเสียหาย
+            #severity_level = random.choice(severity_levels)  # สุ่มคลาสความเสียหาย
             #x1, y1, x2, y2 = map(int, obj['box'])
             #cropped_image = image.crop((x1, y1, x2, y2))
             
